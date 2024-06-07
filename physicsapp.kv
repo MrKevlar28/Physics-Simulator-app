@@ -1,0 +1,59 @@
+#:import navigation_screen_manager navigation_screen_manager
+
+MyScreenManager:
+
+<MyScreenManager@NavigationScreenManager>:
+    Screen:
+        name: "main"
+
+        BoxLayoutExample:
+            orientation: "vertical"
+
+            Button:
+                text: "Create Graphs"
+                on_press: root.push("GraphPage")
+            Button:
+                text: "Simulator W/ No Graphs"
+                on_press: root.push("NoGraphSimulatorPage")
+            Button:
+                text: "Simulator"
+                on_press: root.push("SimulatorPage")
+
+    Screen: 
+        name: "GraphPage"
+        BoxLayout:
+            orientation: "vertical"
+            ActionBar:
+                ActionView:
+                    ActionPrevious:
+                        title: "Create Graphs"
+                        on_release: root.pop()
+            Button:
+                text: "1"
+                on_press: root.pop()
+
+    Screen:
+        name: "NoGraphSimulatorPage"
+        BoxLayout:
+            orientation: "vertical"
+            ActionBar:
+                ActionView:
+                    ActionPrevious:
+                        title: "Simulator W/ No Graphs"
+                        on_release: root.pop()
+            Button:
+                text: "2"
+                on_press: root.pop()
+
+    Screen:
+        name: "SimulatorPage"
+        BoxLayout:
+            orientation: "vertical"
+            ActionBar:
+                ActionView:
+                    ActionPrevious:
+                        title: "Simulator"
+                        on_release: root.pop()
+            Button:
+                text: "3"
+                on_press: root.pop()
