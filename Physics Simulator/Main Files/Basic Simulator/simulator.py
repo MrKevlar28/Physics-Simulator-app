@@ -1,7 +1,11 @@
+import threading
 import pygame
 import pymunk
 import pymunk.pygame_util
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import tkinter as tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from VTbutton4simulation import create_button, draw_button, handle_button_event
 from PTbutton4simulation import create_button1, draw_button1, handle_button_event1
@@ -9,6 +13,7 @@ from ATbutton4simulation import create_button2, draw_button2, handle_button_even
 from KEbutton4simulation import create_button3, draw_button3, handle_button_event3
 from PEbutton4simulation import create_button4, draw_button4, handle_button_event4
 from PEvsKEbutton4simulation import create_button5, draw_button5, handle_button_event5
+from Endbutton import create_Endbutton, draw_Endbutton, handle_button_eventend
 
 # Initialize Pygame
 pygame.init()
@@ -17,9 +22,18 @@ pygame.init()
 WIDTH, HEIGHT = 1000, 800
 GROUND_LEVEL = HEIGHT - 10
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
-FPS = 60
+FPS = 60  # Adjust FPS for better performance
+DT = 1 / 60  # Adjust dt for smoother simulation
 
-def draw(space, window, draw_options, button_rect, button1_rect, button2_rect, button3_rect, button4_rect, button5_rect):
+# Shared data lists
+time_data = []
+velocity_data = []
+position_data = []
+acceleration_data = []
+kinetic_energy_data = []
+potential_energy_data = []
+
+def draw(space, window, draw_options, button_rect, button1_rect, button2_rect, button3_rect, button4_rect, button5_rect, Endbutton_rect):
     window.fill("white")  # Clear screen with white color
     space.debug_draw(draw_options)
     draw_button(window, button_rect)  # Draw the velocity button
@@ -28,6 +42,8 @@ def draw(space, window, draw_options, button_rect, button1_rect, button2_rect, b
     draw_button3(window, button3_rect)  # Draw the kinetic energy button
     draw_button4(window, button4_rect)  # Draw the potential energy button
     draw_button5(window, button5_rect)  # Draw the KE vs PE button
+    draw_Endbutton(window,Endbutton_rect) # Draw End button
+    
     pygame.display.update()
 
 def create_boundaries(space, width, height):
@@ -58,79 +74,31 @@ def create_ball(space, radius, mass):
     space.add(body, shape)
     return body
 
-def plot_velocity_time_graph(times, velocities):
-    plt.figure(figsize=(10, 5))
-    plt.plot(times, velocities, label='Velocity')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Velocity (px/s)')
-    plt.title('Velocity-Time Graph')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+def update_plot(ax, x_data, y_data, title, xlabel, ylabel):
+    ax.clear()
+    ax.plot(x_data, y_data)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.grid(True)
 
-def plot_position_time_graph(times, positions):
-    plt.figure(figsize=(10, 5))
-    plt.plot(times, positions, label='Position')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Position (px)')
-    plt.title('Position-Time Graph')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+def create_plot_window(title, xlabel, ylabel, x_data, y_data):
+    plot_window = tk.Toplevel()
+    plot_window.title(title)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    canvas = FigureCanvasTkAgg(fig, master=plot_window)
+    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-def plot_acceleration_time_graph(times, accelerations):
-    plt.figure(figsize=(10, 5))
-    plt.plot(times, accelerations, label='Acceleration')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Acceleration (px/s²)')
-    plt.title('Acceleration-Time Graph')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    def update_plot_wrapper():
+        update_plot(ax, x_data, y_data, title, xlabel, ylabel)
+        canvas.draw()
+        plot_window.after(1000, update_plot_wrapper)  # Update every 1 second to reduce lag
 
-def plot_kinetic_energy_time_graph(times, kinetic_energies):
-    plt.figure(figsize=(10, 5))
-    plt.plot(times, kinetic_energies, label='Kinetic Energy')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Kinetic Energy (J)')
-    plt.title('Kinetic Energy-Time Graph')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    update_plot_wrapper()
 
-def plot_potential_energy_time_graph(times, potential_energies):
-    plt.figure(figsize=(10, 5))
-    plt.plot(times, potential_energies, label='Potential Energy')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Potential Energy (J)')
-    plt.title('Potential Energy-Time Graph')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def plot_total_energy_time_graph(times, total_energies):
-    plt.figure(figsize=(10, 5))
-    plt.plot(times, total_energies, label='Total Energy')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Total Energy (J)')
-    plt.title('Total Energy-Time Graph')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def plot_ke_vs_pe_graph(kinetic_energies, potential_energies):
-    plt.figure(figsize=(10, 5))
-    plt.plot(kinetic_energies, potential_energies, label='KE vs PE', marker='o')
-    plt.xlabel('Kinetic Energy (J)')
-    plt.ylabel('Potential Energy (J)')
-    plt.title('Kinetic Energy vs Potential Energy Graph')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def run(window, width, height):
+def run_simulation(window, width, height):
     clock = pygame.time.Clock()
-    dt = 1 / 144  # Use a smaller time step for more accuracy
+    dt = DT
 
     space = pymunk.Space()
     space.gravity = (0, 981)  # Gravity in the y-direction
@@ -157,30 +125,36 @@ def run(window, width, height):
     button3_rect = create_button3(window, width, height)
     button4_rect = create_button4(window, width, height)
     button5_rect = create_button5(window, width, height)
+    Endbutton_rect = create_Endbutton(window,width,height)
 
     previous_velocity_y = 0
 
     mass = 10
     gravity = 981
 
-    while run_simulation:
+    def handle_events():
+        nonlocal run_simulation
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run_simulation = False
             elif handle_button_event(event, button_rect):
-                run_simulation = False  # Stop the simulation to show the velocity graph
+                create_plot_window("Velocity-Time Graph", "Time (s)", "Velocity (px/s)", times, velocities)
             elif handle_button_event1(event, button1_rect):
-                run_simulation = False  # Stop the simulation to show the position graph
+                create_plot_window("Position-Time Graph", "Time (s)", "Position (px)", times, positions)
             elif handle_button_event2(event, button2_rect):
-                run_simulation = False  # Stop the simulation to show the acceleration graph
+                create_plot_window("Acceleration-Time Graph", "Time (s)", "Acceleration (px/s²)", times, accelerations)
             elif handle_button_event3(event, button3_rect):
-                run_simulation = False  # Stop the simulation to show the kinetic energy graph
+                create_plot_window("Kinetic Energy-Time Graph", "Time (s)", "Kinetic Energy (J)", times, kinetic_energies)
             elif handle_button_event4(event, button4_rect):
-                run_simulation = False  # Stop the simulation to show the potential energy graph
+                create_plot_window("Potential Energy-Time Graph", "Time (s)", "Potential Energy (J)", times, potential_energies)
             elif handle_button_event5(event, button5_rect):
-                run_simulation = False  # Stop the simulation to show the KE vs PE graph
+                create_plot_window("Kinetic Energy vs Potential Energy Graph", "Kinetic Energy (J)", "Potential Energy (J)", kinetic_energies, potential_energies)
+            elif handle_button_eventend(event, Endbutton_rect):        
+                run_simulation = False
 
-        draw(space, window, draw_options, button_rect, button1_rect, button2_rect, button3_rect, button4_rect, button5_rect)
+    while run_simulation:
+        handle_events()
+        draw(space, window, draw_options, button_rect, button1_rect, button2_rect, button3_rect, button4_rect, button5_rect, Endbutton_rect)
         space.step(dt)
 
         # Record velocity, position, acceleration, and time
@@ -206,27 +180,26 @@ def run(window, width, height):
 
         time_elapsed += dt
 
-        # Print for debugging purposes
-        print(f"Time: {time_elapsed:.2f} s, Velocity: {current_velocity_y:.2f} px/s, Acceleration: {velocity_change_y:.2f} px/s², KE: {kinetic_energy:.2f} J, PE: {potential_energy:.2f} J, Total Energy: {total_energy:.2f} J")
+        # Update plot data
+        time_data.append(time_elapsed)
+        velocity_data.append(current_velocity_y)
+        position_data.append(ball.position.y)
+        acceleration_data.append(velocity_change_y)
+        kinetic_energy_data.append(kinetic_energy)
+        potential_energy_data.append(potential_energy)
 
         previous_velocity_y = current_velocity_y
-
         clock.tick(FPS)
-
+    
     pygame.quit()
 
-    if handle_button_event(event, button_rect):
-        plot_velocity_time_graph(times, velocities)
-    elif handle_button_event1(event, button1_rect):
-        plot_position_time_graph(times, positions)
-    elif handle_button_event2(event, button2_rect):
-        plot_acceleration_time_graph(times, accelerations)
-    elif handle_button_event3(event, button3_rect):
-        plot_kinetic_energy_time_graph(times, kinetic_energies)
-    elif handle_button_event4(event, button4_rect):
-        plot_potential_energy_time_graph(times, potential_energies)
-    elif handle_button_event5(event, button5_rect):
-        plot_ke_vs_pe_graph(kinetic_energies, potential_energies)
+def start_simulation():
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window
+    simulation_thread = threading.Thread(target=run_simulation, args=(WINDOW, WIDTH, HEIGHT))
+    simulation_thread.start()
+    root.mainloop()
+    simulation_thread.join()
 
 if __name__ == "__main__":
-    run(WINDOW, WIDTH, HEIGHT)
+    start_simulation()
